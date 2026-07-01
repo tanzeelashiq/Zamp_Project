@@ -37,7 +37,7 @@ model Submission {
 
   // Outcome
   status     String  @default("pending") // approved | pending | rejected
-  decision   String? // full reasoning text
+  decision   String?
   emailSent  Boolean @default(false)
 
   stages ValidationStage[]
@@ -48,7 +48,7 @@ model ValidationStage {
   submissionId String
   stageNumber  Int
   stageName    String
-  status       String   // pass | fail | warning | running
+  status       String
   message      String
   createdAt    DateTime @default(now())
 

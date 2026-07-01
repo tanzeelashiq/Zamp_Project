@@ -1,24 +1,14 @@
 'use client'
 
 import StatusBadge from './StatusBadge'
-
-interface Stage {
-  stageNumber: number
-  stageName: string
-  status: string
-  message: string
-}
+import { Stage } from '@/types'
 
 const icons: Record<string, string> = {
-  pass:    '✓',
-  fail:    '✕',
-  warning: '⚠',
-  running: '…',
+  pass: '✓', fail: '✕', warning: '⚠', running: '…',
 }
 
 export default function StageCard({ stage, running }: { stage: Stage; running?: boolean }) {
   const status = running ? 'running' : stage.status
-
   return (
     <div className={`flex items-start gap-3 p-4 rounded-lg border transition-all ${
       status === 'running' ? 'border-blue-200 bg-blue-50' :

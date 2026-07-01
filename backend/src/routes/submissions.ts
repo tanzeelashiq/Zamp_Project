@@ -1,17 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db'
+import { Router } from 'express'
+import { prisma } from '../db'
 
-export async function GET() {
+const router = Router()
+
+router.get('/', async (_req, res) => {
   const submissions = await prisma.submission.findMany({
     orderBy: { createdAt: 'desc' },
     include: { stages: { orderBy: { stageNumber: 'asc' } } },
   })
-  return NextResponse.json(submissions)
-}
+  res.json(submissions)
+})
 
-export async function POST(req: NextRequest) {
-  const body = await req.json()
-
+router.post('/', async (req, res) => {
+  const body = req.body
   const submission = await prisma.submission.create({
     data: {
       companyName:        body.companyName,
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest) {
       regDocName:         body.regDocName,
     },
   })
+  res.status(201).json({ id: submission.id })
+})
 
-  return NextResponse.json({ id: submission.id }, { status: 201 })
-}
+export default router

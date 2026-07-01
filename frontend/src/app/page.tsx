@@ -1,14 +1,9 @@
 import Link from 'next/link'
-import { prisma } from '@/lib/db'
+import { getSubmissions } from '@/lib/api'
 import StatusBadge from '@/components/StatusBadge'
 
-export const revalidate = 0
-
 export default async function Dashboard() {
-  const submissions = await prisma.submission.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: { stages: { orderBy: { stageNumber: 'asc' } } },
-  })
+  const submissions = await getSubmissions()
 
   const counts = {
     total:    submissions.length,
@@ -29,7 +24,6 @@ export default async function Dashboard() {
         </Link>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
         {[
           { label: 'Total',    value: counts.total,    color: 'text-gray-900' },
@@ -44,7 +38,6 @@ export default async function Dashboard() {
         ))}
       </div>
 
-      {/* Table */}
       {submissions.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <p className="text-gray-500">No submissions yet.</p>
@@ -69,20 +62,11 @@ export default async function Dashboard() {
                 <tr key={sub.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-medium text-gray-900">{sub.companyName}</td>
                   <td className="px-4 py-3 text-gray-600">{sub.country}</td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {new Date(sub.createdAt).toLocaleDateString()}
-                  </td>
+                  <td className="px-4 py-3 text-gray-500">{new Date(sub.createdAt).toLocaleDateString()}</td>
+                  <td className="px-4 py-3"><StatusBadge status={sub.status} /></td>
+                  <td className="px-4 py-3 text-gray-500">{sub.emailSent ? '✓ Sent' : '—'}</td>
                   <td className="px-4 py-3">
-                    <StatusBadge status={sub.status} />
-                  </td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {sub.emailSent ? '✓ Sent' : '—'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/submissions/${sub.id}`}
-                      className="text-brand-600 hover:underline text-xs font-medium"
-                    >
+                    <Link href={`/submissions/${sub.id}`} className="text-brand-600 hover:underline text-xs font-medium">
                       View →
                     </Link>
                   </td>
