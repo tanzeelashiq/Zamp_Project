@@ -1,7 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import { SubmissionInput } from '../types'
 
-const client = new Anthropic()
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '')
 
 export async function runAIReasoningPass(
   data: SubmissionInput,
@@ -34,22 +34,14 @@ Analyze this submission holistically. Look for:
 3. Contact information credibility (e.g. free email domain for a claimed large company)
 4. Any other subtle red flags a compliance analyst would notice
 
-Respond in JSON with exactly this structure:
-{
-  "verdict": "pass" | "warning" | "fail",
-  "finding": "one concise sentence describing the most important finding, or 'No additional issues found.' if clean"
-}`
+Respond in JSON only — no markdown, no explanation outside the JSON:
+{"verdict": "pass" | "warning" | "fail", "finding": "one concise sentence"}`
 
   try {
-    const response = await client.messages.create({
-      model: 'claude-opus-4-8',
-      max_tokens: 512,
-      thinking: { type: 'adaptive' },
-      messages: [{ role: 'user', content: prompt }],
-    })
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    const result = await model.generateContent(prompt)
+    const raw = result.response.text().trim()
 
-    const textBlock = response.content.find(b => b.type === 'text')
-    const raw = textBlock?.type === 'text' ? textBlock.text.trim() : ''
     const jsonMatch = raw.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
       return { status: 'warning', message: 'AI review completed — no structured findings returned.' }
