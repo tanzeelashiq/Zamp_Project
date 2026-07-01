@@ -1,0 +1,56 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Submission {
+  id          String   @id @default(cuid())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Company details
+  companyName        String
+  country            String
+  registrationNumber String
+  businessAddress    String
+
+  // Contact
+  contactName  String
+  contactEmail String
+  contactPhone String
+
+  // Banking
+  bankName          String
+  accountHolderName String
+  accountNumber     String
+  routingOrIban     String
+  swiftBic          String
+
+  // Tax & compliance
+  taxId        String
+  taxDocName   String
+  regDocName   String
+
+  // Outcome
+  status     String  @default("pending") // approved | pending | rejected
+  decision   String? // full reasoning text
+  emailSent  Boolean @default(false)
+
+  stages ValidationStage[]
+}
+
+model ValidationStage {
+  id           String   @id @default(cuid())
+  submissionId String
+  stageNumber  Int
+  stageName    String
+  status       String   // pass | fail | warning | running
+  message      String
+  createdAt    DateTime @default(now())
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+}
