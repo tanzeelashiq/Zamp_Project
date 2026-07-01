@@ -1,6 +1,10 @@
 import { Submission } from '@/types'
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
+// API_URL for server components, NEXT_PUBLIC_API_URL for client components
+const BASE =
+  process.env.API_URL ??
+  process.env.NEXT_PUBLIC_API_URL ??
+  'http://localhost:4000'
 
 export async function getSubmissions(): Promise<Submission[]> {
   const res = await fetch(`${BASE}/submissions`, { cache: 'no-store' })

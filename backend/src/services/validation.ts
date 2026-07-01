@@ -17,33 +17,41 @@ function isValidRouting(value: string): boolean {
   return /^\d{9}$/.test(value.replace(/\s/g, ''))
 }
 
-export function checkCompleteness(data: SubmissionInput): Stage {
-  const requiredFields: Array<[keyof SubmissionInput, string]> = [
-    ['companyName', 'Company name'],
-    ['country', 'Country'],
-    ['registrationNumber', 'Registration number'],
-    ['businessAddress', 'Business address'],
-    ['contactName', 'Contact name'],
-    ['contactEmail', 'Contact email'],
-    ['contactPhone', 'Phone number'],
-    ['bankName', 'Bank name'],
-    ['accountHolderName', 'Account holder name'],
-    ['accountNumber', 'Account number'],
-    ['routingOrIban', 'Routing / IBAN'],
-    ['swiftBic', 'SWIFT/BIC'],
-    ['taxId', 'Tax ID'],
-    ['taxDocName', 'Tax document'],
-    ['regDocName', 'Registration document'],
-  ]
+// Country name keywords mapped to their country code
+const COUNTRY_KEYWORDS: Record<string, string[]> = {
+  US: ['united states', 'usa', 'u.s.', 'america'],
+  GB: ['united kingdom', 'uk', 'u.k.', 'england', 'britain', 'scotland', 'wales'],
+  DE: ['germany', 'deutschland'],
+  AU: ['australia'],
+  CA: ['canada'],
+  IN: ['india'],
+}
 
-  const missing = requiredFields
-    .filter(([key]) => !data[key] || String(data[key]).trim() === '')
-    .map(([, label]) => label)
+export function checkAddressCountryConsistency(data: SubmissionInput): Stage {
+  const declaredCountry = data.country.toUpperCase()
+  const addressLower = data.businessAddress.toLowerCase()
 
-  if (missing.length > 0) {
-    return { stageNumber: 1, stageName: 'Completeness Check', status: 'fail', message: `Missing required fields: ${missing.join(', ')}.` }
+  // Only check countries we have keyword data for
+  const keywords = COUNTRY_KEYWORDS[declaredCountry]
+  if (!keywords) {
+    return { stageNumber: 1, stageName: 'Address & Country Check', status: 'pass', message: 'Address and country declaration are consistent.' }
   }
-  return { stageNumber: 1, stageName: 'Completeness Check', status: 'pass', message: 'All required fields are present.' }
+
+  // Check if any other country's keywords appear in the address
+  for (const [code, words] of Object.entries(COUNTRY_KEYWORDS)) {
+    if (code === declaredCountry) continue
+    const conflict = words.find(w => addressLower.includes(w))
+    if (conflict) {
+      return {
+        stageNumber: 1,
+        stageName: 'Address & Country Check',
+        status: 'fail',
+        message: `Business address appears to reference "${conflict}" but declared country is ${data.country}. Please ensure the address matches the registered country.`,
+      }
+    }
+  }
+
+  return { stageNumber: 1, stageName: 'Address & Country Check', status: 'pass', message: 'Business address is consistent with the declared country.' }
 }
 
 export function checkFormats(data: SubmissionInput): Stage {

@@ -11,6 +11,18 @@ router.get('/', async (_req, res) => {
   res.json(submissions)
 })
 
+router.get('/:id', async (req, res) => {
+  const submission = await prisma.submission.findUnique({
+    where: { id: req.params.id },
+    include: { stages: { orderBy: { stageNumber: 'asc' } } },
+  })
+  if (!submission) {
+    res.status(404).json({ error: 'Submission not found' })
+    return
+  }
+  res.json(submission)
+})
+
 router.post('/', async (req, res) => {
   const body = req.body
   const submission = await prisma.submission.create({
