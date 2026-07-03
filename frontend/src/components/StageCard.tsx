@@ -7,7 +7,9 @@ const icons: Record<string, string> = {
   pass: '✓', fail: '✕', warning: '⚠', running: '⋯',
 }
 
-export default function StageCard({ stage, running, elapsed }: { stage: Stage; running?: boolean; elapsed?: number }) {
+export default function StageCard({ stage, running, elapsed, confidence }: {
+  stage: Stage; running?: boolean; elapsed?: number; confidence?: number
+}) {
   const status = running ? 'running' : stage.status
 
   return (
@@ -35,6 +37,15 @@ export default function StageCard({ stage, running, elapsed }: { stage: Stage; r
           <div className="flex items-center gap-2">
             {elapsed !== undefined && !running && (
               <span className="text-xs text-gray-400">{(elapsed / 1000).toFixed(1)}s</span>
+            )}
+            {confidence !== undefined && confidence > 0 && !running && (
+              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                confidence >= 80 ? 'bg-green-100 text-green-700' :
+                confidence >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                                   'bg-red-100 text-red-700'
+              }`}>
+                {confidence}% confidence
+              </span>
             )}
             <StatusBadge status={status} />
           </div>

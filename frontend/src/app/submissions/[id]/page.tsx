@@ -15,7 +15,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
 const STAGE_NAMES = [
   'Address & Country Check',
   'Format Validation',
-  'Cross-Reference Check',
+  'Cross-Reference & Credibility',
   'AI Reasoning Pass',
 ]
 
@@ -24,6 +24,7 @@ export default function SubmissionPage() {
   const [submission, setSubmission] = useState<Submission | null>(null)
   const [stages, setStages] = useState<Stage[]>([])
   const [stageTimings, setStageTimings] = useState<Record<number, number>>({})
+  const [stageConfidence, setStageConfidence] = useState<Record<number, number>>({})
   const [runningStage, setRunningStage] = useState<number | null>(null)
   const [finalStatus, setFinalStatus] = useState<string | null>(null)
   const [decision, setDecision] = useState<string | null>(null)
@@ -54,6 +55,7 @@ export default function SubmissionPage() {
     setValidating(true)
     setStages([])
     setStageTimings({})
+    setStageConfidence({})
     setFinalStatus(null)
     setDecision(null)
     setEmailHtml(null)
@@ -71,6 +73,9 @@ export default function SubmissionPage() {
         setRunningStage(null)
         if (data.elapsed !== undefined) {
           setStageTimings(prev => ({ ...prev, [data.stage.stageNumber]: data.elapsed }))
+        }
+        if (data.confidence !== undefined) {
+          setStageConfidence(prev => ({ ...prev, [data.stage.stageNumber]: data.confidence }))
         }
         setStages(prev => {
           const next = [...prev]
@@ -223,6 +228,7 @@ export default function SubmissionPage() {
                     stage={stage}
                     running={running}
                     elapsed={stageTimings[stage.stageNumber]}
+                    confidence={stageConfidence[stage.stageNumber]}
                   />
                 ) : null
               )}

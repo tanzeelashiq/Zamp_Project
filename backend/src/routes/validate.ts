@@ -56,7 +56,7 @@ router.get('/', async (req: Request, res: Response) => {
     send({ type: 'stage_done', stage: s2, elapsed: Date.now() - t2 })
 
     // Stage 3 — cross-reference checks
-    send({ type: 'stage_start', stageNumber: 3, stageName: 'Cross-Reference Check' })
+    send({ type: 'stage_start', stageNumber: 3, stageName: 'Cross-Reference & Credibility' })
     const t3 = Date.now()
     const existingSubmissions = await prisma.submission.findMany({
       where: { id: { not: submissionId } },
@@ -81,7 +81,7 @@ router.get('/', async (req: Request, res: Response) => {
     await prisma.validationStage.create({
       data: { submissionId, stageNumber: 4, stageName: s4.stageName, status: s4.status, message: s4.message },
     })
-    send({ type: 'stage_done', stage: s4, elapsed: Date.now() - t4 })
+    send({ type: 'stage_done', stage: s4, elapsed: Date.now() - t4, confidence: s4Raw.confidence })
 
     // Final decision
     const { status, summary } = deriveStatus(stages)

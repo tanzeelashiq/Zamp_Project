@@ -6,36 +6,46 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '')
 export async function runAIReasoningPass(
   data: SubmissionInput,
   priorIssues: string[]
-): Promise<{ status: 'pass' | 'fail' | 'warning'; message: string }> {
+): Promise<{ status: 'pass' | 'fail' | 'warning'; message: string; confidence: number }> {
   const hasPriorFailures = priorIssues.length > 0
 
-  const prompt = `You are a vendor onboarding compliance analyst. Review the following vendor submission for subtle inconsistencies, potential fraud signals, or missing credibility markers that rule-based checks may miss.
+  const prompt = `You are a senior vendor compliance analyst performing the final holistic review of a vendor onboarding submission. The previous automated checks ${hasPriorFailures ? 'flagged issues (listed below)' : 'all passed'}.
+
+Your job is to find SUBTLE issues that rule-based checks cannot detect — things a human analyst would notice.
 
 VENDOR SUBMISSION:
 - Company Name: ${data.companyName}
 - Country: ${data.country}
 - Registration Number: ${data.registrationNumber}
 - Business Address: ${data.businessAddress}
-- Contact: ${data.contactName} (${data.contactEmail}, ${data.contactPhone})
-- Bank: ${data.bankName}
-- Account Holder: ${data.accountHolderName}
+- Contact Person: ${data.contactName}
+- Contact Email: ${data.contactEmail}
+- Contact Phone: ${data.contactPhone}
+- Bank Name: ${data.bankName}
+- Account Holder Name: ${data.accountHolderName}
 - Account Number: ${data.accountNumber}
 - Routing/IBAN: ${data.routingOrIban}
-- SWIFT/BIC: ${data.swiftBic}
+- SWIFT/BIC Code: ${data.swiftBic}
 - Tax ID: ${data.taxId}
-- Tax Document: ${data.taxDocName}
-- Registration Document: ${data.regDocName}
+- Tax Document Filename: ${data.taxDocName}
+- Registration Document Filename: ${data.regDocName}
 
-PRIOR RULE-BASED FINDINGS: ${hasPriorFailures ? priorIssues.join('; ') : 'None — all rule-based checks passed.'}
+${hasPriorFailures ? `PRIOR AUTOMATED FINDINGS: ${priorIssues.join('; ')}` : ''}
 
-Analyze this submission holistically. Look for:
-1. Internal inconsistencies (e.g. address country vs declared country, bank country vs business country)
-2. Document plausibility (e.g. document names that suggest wrong file type, e.g. "invoice.pdf" instead of a W-9)
-3. Contact information credibility (e.g. free email domain for a claimed large company)
-4. Any other subtle red flags a compliance analyst would notice
+ANALYZE FOR:
+1. DOCUMENT PLAUSIBILITY — Do the document filenames make sense? A tax document should be named like "W9_*.pdf" or "VAT_*.pdf", not "invoice_*.pdf" or "receipt_*.pdf". A business registration should reference incorporation/registration, not unrelated documents.
+2. CONTACT CREDIBILITY — Does the contact person name seem plausible for this type of company? Is the phone number format consistent with the declared country?
+3. BANK PLAUSIBILITY — Does the bank name seem like a real institution for this country? Does the SWIFT code prefix match the bank name?
+4. INTERNAL CONSISTENCY — Do all the pieces of data tell a coherent story about one real company?
+5. RED FLAGS — Anything else suspicious: generic placeholder-like data, copy-paste errors, inconsistent naming conventions.
 
-Respond in JSON only — no markdown, no explanation outside the JSON:
-{"verdict": "pass" | "warning" | "fail", "finding": "one concise sentence"}`
+Respond ONLY with this exact JSON structure (no markdown, no explanation):
+{"verdict": "pass", "confidence": 92, "finding": "All data points are internally consistent. Document names match expected types for the declared country."}
+
+Where:
+- verdict: "pass" (clean), "warning" (suspicious but not conclusive), or "fail" (strong fraud signal)
+- confidence: 0-100 (how confident you are in your verdict)
+- finding: One clear sentence explaining your most important observation`
 
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
@@ -44,12 +54,16 @@ Respond in JSON only — no markdown, no explanation outside the JSON:
 
     const jsonMatch = raw.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
-      return { status: 'warning', message: 'AI review completed — no structured findings returned.' }
+      return { status: 'warning', message: 'AI review completed but could not parse structured response.', confidence: 0 }
     }
+
     const parsed = JSON.parse(jsonMatch[0])
-    const status = parsed.verdict === 'fail' ? 'fail' : parsed.verdict === 'warning' ? 'warning' : 'pass'
-    return { status, message: parsed.finding || 'AI reasoning pass complete.' }
-  } catch {
-    return { status: 'warning', message: 'AI reasoning pass could not complete — manual review recommended.' }
+    const verdict = parsed.verdict === 'fail' ? 'fail' : parsed.verdict === 'warning' ? 'warning' : 'pass'
+    const confidence = Math.min(100, Math.max(0, Number(parsed.confidence) || 75))
+    const finding = parsed.finding || 'AI reasoning pass complete.'
+
+    return { status: verdict, message: finding, confidence }
+  } catch (err) {
+    return { status: 'warning', message: 'AI reasoning pass could not complete — manual review recommended.', confidence: 0 }
   }
 }
