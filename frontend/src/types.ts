@@ -1,4 +1,4 @@
-export type StageStatus = 'running' | 'pass' | 'fail' | 'warning'
+export type StageStatus = 'running' | 'pass' | 'fail' | 'warning' | 'pending'
 
 export interface Stage {
   stageNumber: number
