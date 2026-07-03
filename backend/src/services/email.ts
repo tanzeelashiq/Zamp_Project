@@ -1,7 +1,7 @@
 import { Resend } from 'resend'
 import { Stage } from '../types'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
 const FROM = process.env.FROM_EMAIL ?? 'onboarding@example.com'
 
 export function buildEmailHtml({
@@ -63,5 +63,5 @@ export async function sendVendorFollowUp({
       ? `Action required: Your vendor submission for ${companyName}`
       : `Your vendor submission for ${companyName} requires clarification`
 
-  await resend.emails.send({ from: FROM, to, subject, html })
+  await resend?.emails.send({ from: FROM, to, subject, html })
 }
