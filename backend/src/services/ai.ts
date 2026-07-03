@@ -64,6 +64,11 @@ Where:
 
     return { status: verdict, message: finding, confidence }
   } catch (err) {
-    return { status: 'warning', message: 'AI reasoning pass could not complete — manual review recommended.', confidence: 0 }
+    const errMsg = err instanceof Error ? err.message : String(err)
+    console.error('AI reasoning pass error:', errMsg)
+    if (!process.env.GEMINI_API_KEY) {
+      return { status: 'warning', message: 'AI service not configured — GEMINI_API_KEY is missing. Manual review recommended.', confidence: 0 }
+    }
+    return { status: 'warning', message: `AI reasoning pass encountered an error: ${errMsg.slice(0, 100)}. Manual review recommended.`, confidence: 0 }
   }
 }
