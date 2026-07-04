@@ -2,7 +2,15 @@ import { SubmissionInput } from '../types'
 
 // Uses OpenRouter's free models — get a key at https://openrouter.ai/keys
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? ''
-const MODEL = process.env.AI_MODEL ?? 'google/gemma-4-31b-it:free'
+
+// Fallback chain: if one model is rate-limited, try the next
+const FREE_MODELS = [
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'qwen/qwen3-coder:free',
+  'nvidia/nemotron-3-super-120b-a12b:free',
+  'google/gemma-4-31b-it:free',
+  'nousresearch/hermes-3-llama-3.1-405b:free',
+]
 
 export async function runAIReasoningPass(
   data: SubmissionInput,
@@ -53,48 +61,59 @@ Rules:
 - finding must be one clear sentence explaining your most important observation
 - Return ONLY the JSON object, nothing else`
 
-  try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://zamp-vendor-onboarding.onrender.com',
-        'X-Title': 'Vendor Onboarding Validator',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 200,
-        temperature: 0.3,
-      }),
-    })
+  // Try each model in the fallback chain
+  for (const model of FREE_MODELS) {
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://zamp-vendor-onboarding.onrender.com',
+          'X-Title': 'Vendor Onboarding Validator',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 200,
+          temperature: 0.3,
+        }),
+      })
 
-    if (!response.ok) {
-      const errBody = await response.text()
-      console.error('OpenRouter error:', response.status, errBody)
-      return { status: 'warning', message: `AI service returned ${response.status}. Manual review recommended.`, confidence: 0 }
+      // If rate limited, try next model
+      if (response.status === 429) {
+        console.log(`Model ${model} rate limited, trying next...`)
+        continue
+      }
+
+      if (!response.ok) {
+        console.error(`Model ${model} returned ${response.status}`)
+        continue
+      }
+
+      const json: any = await response.json()
+      const raw = json.choices?.[0]?.message?.content?.trim() ?? ''
+
+      console.log(`AI response from ${model}:`, raw)
+
+      const jsonMatch = raw.match(/\{[\s\S]*?\}/)
+      if (!jsonMatch) {
+        console.log(`Model ${model} did not return JSON, trying next...`)
+        continue
+      }
+
+      const parsed = JSON.parse(jsonMatch[0])
+      const verdict = parsed.verdict === 'fail' ? 'fail' : parsed.verdict === 'warning' ? 'warning' : 'pass'
+      const confidence = Math.min(100, Math.max(0, Number(parsed.confidence) || 75))
+      const finding = parsed.finding || 'AI reasoning pass complete.'
+
+      return { status: verdict, message: finding, confidence }
+    } catch (err) {
+      console.error(`Model ${model} error:`, err)
+      continue
     }
-
-    const json: any = await response.json()
-    const raw = json.choices?.[0]?.message?.content?.trim() ?? ''
-
-    console.log('AI raw response:', raw)
-
-    const jsonMatch = raw.match(/\{[\s\S]*?\}/)
-    if (!jsonMatch) {
-      return { status: 'warning', message: `AI review completed but response was not structured JSON. Raw: "${raw.slice(0, 100)}"`, confidence: 0 }
-    }
-
-    const parsed = JSON.parse(jsonMatch[0])
-    const verdict = parsed.verdict === 'fail' ? 'fail' : parsed.verdict === 'warning' ? 'warning' : 'pass'
-    const confidence = Math.min(100, Math.max(0, Number(parsed.confidence) || 75))
-    const finding = parsed.finding || 'AI reasoning pass complete.'
-
-    return { status: verdict, message: finding, confidence }
-  } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err)
-    console.error('AI reasoning pass error:', errMsg)
-    return { status: 'warning', message: `AI analysis error: ${errMsg.slice(0, 150)}`, confidence: 0 }
   }
+
+  // All models failed
+  return { status: 'warning', message: 'All AI models are currently unavailable. Manual review recommended.', confidence: 0 }
 }
