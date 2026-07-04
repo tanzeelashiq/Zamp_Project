@@ -76,7 +76,7 @@ Rules:
       return { status: 'warning', message: `AI service returned ${response.status}. Manual review recommended.`, confidence: 0 }
     }
 
-    const json = await response.json()
+    const json: any = await response.json()
     const raw = json.choices?.[0]?.message?.content?.trim() ?? ''
 
     console.log('AI raw response:', raw)
