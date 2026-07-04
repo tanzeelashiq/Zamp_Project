@@ -1,13 +1,15 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { SubmissionInput } from '../types'
+
+// Uses OpenRouter's free models — get a key at https://openrouter.ai/keys
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? ''
+const MODEL = process.env.AI_MODEL ?? 'meta-llama/llama-3.1-8b-instruct:free'
 
 export async function runAIReasoningPass(
   data: SubmissionInput,
   priorIssues: string[]
 ): Promise<{ status: 'pass' | 'fail' | 'warning'; message: string; confidence: number }> {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) {
-    return { status: 'warning', message: 'AI service not configured — GEMINI_API_KEY is missing. Manual review recommended.', confidence: 0 }
+  if (!OPENROUTER_API_KEY) {
+    return { status: 'warning', message: 'AI service not configured — OPENROUTER_API_KEY is missing. Manual review recommended.', confidence: 0 }
   }
 
   const hasPriorFailures = priorIssues.length > 0
@@ -48,13 +50,34 @@ Respond ONLY with this exact JSON structure (no markdown, no code fences, no exp
 Rules:
 - verdict must be exactly one of: "pass", "warning", or "fail"
 - confidence must be a number between 0 and 100
-- finding must be one clear sentence explaining your most important observation`
+- finding must be one clear sentence explaining your most important observation
+- Return ONLY the JSON object, nothing else`
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
-    const result = await model.generateContent(prompt)
-    const raw = result.response.text().trim()
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://zamp-vendor-onboarding.onrender.com',
+        'X-Title': 'Vendor Onboarding Validator',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 200,
+        temperature: 0.3,
+      }),
+    })
+
+    if (!response.ok) {
+      const errBody = await response.text()
+      console.error('OpenRouter error:', response.status, errBody)
+      return { status: 'warning', message: `AI service returned ${response.status}. Manual review recommended.`, confidence: 0 }
+    }
+
+    const json = await response.json()
+    const raw = json.choices?.[0]?.message?.content?.trim() ?? ''
 
     console.log('AI raw response:', raw)
 
