@@ -2,7 +2,7 @@ import { SubmissionInput } from '../types'
 
 // Uses OpenRouter's free models — get a key at https://openrouter.ai/keys
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? ''
-const MODEL = process.env.AI_MODEL ?? 'meta-llama/llama-3.1-8b-instruct:free'
+const MODEL = process.env.AI_MODEL ?? 'google/gemma-4-31b-it:free'
 
 export async function runAIReasoningPass(
   data: SubmissionInput,
